@@ -2,14 +2,41 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    // Check if MONGODB_URI is set
+    if (!process.env.MONGODB_URI) {
+      console.error('❌ MONGODB_URI is not set in environment variables');
+      console.log('💡 Please set MONGODB_URI in your Render environment variables');
+      return;
+    }
 
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    // Connection options for better reliability on cloud platforms
+    const options = {
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+      family: 4, // Use IPv4, skip trying IPv6
+      retryWrites: true,
+      w: 'majority'
+    };
+
+    const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📊 Database: ${conn.connection.name}`);
   } catch (error) {
-    console.error('Database connection error:', error.message);
+    console.error('❌ Database connection error:', error.message);
+    
+    // More specific error messages
+    if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
+      console.error('💡 Network error: Check your MongoDB Atlas connection string');
+      console.error('💡 Ensure your IP is whitelisted in MongoDB Atlas Network Access');
+    } else if (error.message.includes('authentication failed')) {
+      console.error('💡 Authentication failed: Check your MongoDB username and password');
+    } else if (error.message.includes('timeout')) {
+      console.error('💡 Connection timeout: Check your network connection and MongoDB Atlas status');
+    }
+    
     console.log('⚠️  Server will continue without database connection');
-    console.log('💡 To fix: Set up MongoDB locally or update MONGODB_URI to MongoDB Atlas');
-    // Don't exit process - allow server to start for API testing
+    console.log('💡 To fix: Verify MONGODB_URI in Render environment variables');
   }
 };
 
