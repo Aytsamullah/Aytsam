@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { User, UserRole, PatientProfile, Treatment, MedicalFile } from '../types';
+import { generateTreatmentPDF } from '../utils/pdfGenerator';
 
 interface DashboardProps {
   user: User;
@@ -43,18 +44,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
     return patients.find(p => p.id === user.id || p.email === user.email) || null;
   }, [isDoctor, patients, selectedPatientId, user.id, user.email]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const newFiles: MedicalFile[] = Array.from(files).map((file: File) => ({
-      id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      fileName: file.name,
-      fileType: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
-      fileUrl: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString()
-    }));
+    const filePromises = Array.from(files).map((file: File) => {
+      return new Promise<MedicalFile>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve({
+            id: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            fileName: file.name,
+            fileType: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
+            fileUrl: reader.result as string,
+            uploadedAt: new Date().toISOString()
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
 
+    const newFiles = await Promise.all(filePromises);
     setSelectedFiles(prev => [...prev, ...newFiles]);
   };
 
@@ -94,13 +104,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
   };
 
   return (
-    <div className="grid lg:grid-cols-12 gap-8 h-[calc(100vh-10rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-auto lg:h-[calc(100vh-10rem)]">
       {/* Main Content Area - Full Width */}
       <div className="lg:col-span-12 flex flex-col gap-6">
         {!activePatient && isDoctor ? (
           // PATIENT SEARCH VIEW
-          <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-2xl mx-auto w-full animate-in fade-in zoom-in-95 duration-500">
-            <div className="bg-white p-10 rounded-[3rem] shadow-2xl shadow-blue-900/5 border border-slate-200 w-full text-center relative overflow-hidden group">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-2xl mx-auto w-full animate-in fade-in zoom-in-95 duration-500 px-4">
+            <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl shadow-blue-900/5 border border-slate-200 w-full text-center relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full -mr-32 -mt-32 transition-transform group-hover:scale-110 duration-700"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-50/50 rounded-full -ml-32 -mb-32 transition-transform group-hover:scale-110 duration-700"></div>
 
@@ -158,40 +168,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
           // PATIENT DETAIL VIEW
           <>
             {/* Patient Header Card */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group">
+            <div className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 group-hover:bg-blue-100 transition-colors duration-500"></div>
 
               <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
+                <div className="w-full md:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
                     {isDoctor && (
                       <button
                         onClick={() => setSelectedPatientId(null)}
-                        className="mr-2 p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                        className="mr-1 p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
                         title="Back to Patient List"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                       </button>
                     )}
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{activePatient.name}</h1>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase tracking-wider">Active Patient</span>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{activePatient.name}</h1>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">Active Patient</span>
                   </div>
-                  <p className="text-slate-500 text-sm font-medium flex items-center">
+                  <p className="text-slate-500 text-sm font-medium flex flex-wrap items-center gap-2 sm:gap-0">
                     <span className="mr-3 font-mono">ID: {activePatient.id}</span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full mr-3"></span>
+                    <span className="hidden sm:inline w-1 h-1 bg-slate-300 rounded-full mr-3"></span>
                     <span className="font-mono">CNIC: {activePatient.cnic}</span>
                   </p>
                 </div>
 
-                <div className="flex gap-3">
-                  <div className="text-right hidden sm:block">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                  <div className="text-left sm:text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Primary Contact</p>
-                    <p className="text-sm font-semibold text-slate-700">{activePatient.email}</p>
+                    <p className="text-sm font-semibold text-slate-700 truncate">{activePatient.email}</p>
                   </div>
                   {isDoctor && (
                     <button
                       onClick={() => setIsAddingTreatment(true)}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+                      className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
                     >
                       New Clinical Record
                     </button>
@@ -227,7 +237,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
 
             {/* Treatment Journal */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex-grow overflow-hidden flex flex-col">
-              <div className="px-8 py-5 border-b border-slate-200 bg-white flex justify-between items-center">
+              <div className="px-4 sm:px-8 py-5 border-b border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <h2 className="font-bold text-slate-900 flex items-center">
                   Clinical Timeline
                   <span className="ml-3 text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">Auto-Sync Active</span>
@@ -239,7 +249,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
                 )}
               </div>
 
-              <div className="flex-grow overflow-y-auto p-8 space-y-6">
+              <div className="flex-grow overflow-y-auto p-4 sm:p-8 space-y-6">
                 {activePatient.treatments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-slate-300 space-y-4">
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
@@ -266,6 +276,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
                           </div>
 
                           <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => activePatient && generateTreatmentPDF(t, activePatient)}
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Download Record PDF"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </button>
                             {/* Delete Button - Only for Patient User */}
                             {!isDoctor && (
                               <button
@@ -340,24 +357,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, patients, onAddTreatment, o
               </svg>
             </div>
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-slate-900">Waiting for Selection</h3>
-              <p className="text-sm max-w-xs mx-auto leading-relaxed">Search for a patient by name or CNIC using the sidebar directory to access their longitudinal medical record.</p>
+              <h3 className="text-xl font-bold text-slate-900">No records found</h3>
+              <p className="text-sm max-w-xs mx-auto leading-relaxed">There are currently no medical records associated with this profile.</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* New Treatment Modal Overlay */}
       {isAddingTreatment && activePatient && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl p-8 space-y-8 animate-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl p-6 sm:p-8 space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
             <div>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Post Clinical Encounter</h2>
               <p className="text-sm text-slate-500">Documenting record for <span className="text-blue-600 font-bold">{activePatient.name}</span></p>
             </div>
 
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Final Diagnosis</label>
                   <input

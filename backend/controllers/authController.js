@@ -304,11 +304,33 @@ const resendOtp = asyncHandler(async (req, res, next) => {
 const getProfile = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user._id).select('-password');
 
+  let profileData = { user };
+
+  // If user is a patient, fetch their treatments
+  if (user.role === 'patient') {
+    const treatments = await Treatment.find({ patientId: user._id }).sort({ timestamp: -1 });
+
+    // Map to match the structure expected by frontend PatientProfile
+    profileData.user = {
+      ...user.toObject(),
+      treatments: treatments.map(t => ({
+        id: t._id,
+        patientId: t.patientId,
+        doctorId: t.doctorId,
+        doctorName: t.doctorName,
+        diagnosis: t.diagnosis,
+        medication: t.medication,
+        notes: t.notes,
+        files: t.files,
+        timestamp: t.timestamp
+      })),
+      medicalHistory: [] // Placeholder as per schema
+    };
+  }
+
   res.status(200).json({
     success: true,
-    data: {
-      user
-    }
+    data: profileData
   });
 });
 
@@ -455,6 +477,46 @@ const addTreatment = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Delete a treatment record
+// @route   DELETE /api/auth/treatments/:id
+// @access  Private (Patient only)
+const deleteTreatment = asyncHandler(async (req, res, next) => {
+  const treatmentId = req.params.id;
+
+  // Find the treatment
+  const treatment = await Treatment.findById(treatmentId);
+
+  if (!treatment) {
+    return res.status(404).json({
+      success: false,
+      message: 'Treatment record not found'
+    });
+  }
+
+  // Ensure only the patient who owns the record can delete it
+  // (Or potentially a doctor, but requirements say "patient deletes")
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only patients can delete their own records'
+    });
+  }
+
+  if (treatment.patientId.toString() !== req.user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: 'You are not authorized to delete this record'
+    });
+  }
+
+  await treatment.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: 'Treatment record deleted successfully'
+  });
+});
+
 module.exports = {
   signup,
   verifyOtp,
@@ -462,5 +524,6 @@ module.exports = {
   getProfile,
   login,
   getAllPatients,
-  addTreatment
+  addTreatment,
+  deleteTreatment
 };

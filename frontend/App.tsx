@@ -40,6 +40,17 @@ const App: React.FC = () => {
               } catch (e) {
                 console.error('Failed to load patients on init', e);
               }
+            } else if (user.role === 'patient') {
+              // Load self as the patient list for dashboard to work
+              const patientProfile: PatientProfile = {
+                ...user,
+                role: UserRole.PATIENT, // ENFORCE it's a patient role as per strict type
+                // If backend didn't return these (e.g. from older token), default them
+                // However, updated getProfile will return them embedded in user object
+                treatments: (user as any).treatments || [],
+                medicalHistory: (user as any).medicalHistory || []
+              };
+              setPatients([patientProfile]);
             }
           }
         } catch (error) {
@@ -64,12 +75,34 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Failed to fetch patients:', error);
       }
+    } else if (user.role === UserRole.PATIENT) {
+      // We need to fetch the full profile to get treatments
+      try {
+        const response = await authApi.getProfile();
+        if (response.success && response.data) {
+          const fullUser = response.data.user;
+          const patientProfile: PatientProfile = {
+            id: fullUser.id,
+            role: UserRole.PATIENT,
+            name: fullUser.name,
+            email: fullUser.email,
+            cnic: fullUser.cnic,
+            isVerified: fullUser.isVerified,
+            treatments: (fullUser as any).treatments || [],
+            medicalHistory: (fullUser as any).medicalHistory || []
+          };
+          setPatients([patientProfile]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch patient profile:', error);
+      }
     }
   };
 
   const handleSignupSuccess = (user: User, token: string) => {
+    // Note: With recent changes, this might not be called immediately as we redirect to login
+    // But keeping it correct for logic consistency
     setCurrentUser(user);
-    // New doctor signup won't have patients yet, but we strictly shouldn't show mock data
     setPatients([]);
   };
 
@@ -106,16 +139,25 @@ const App: React.FC = () => {
     }
   };
 
-  const deleteTreatment = (patientId: string, treatmentId: string) => {
+  const deleteTreatment = async (patientId: string, treatmentId: string) => {
     // Security: Only patients can delete their own records in this specific implementation
     if (!currentUser || currentUser.role !== UserRole.PATIENT) return;
 
-    setPatients(prev => prev.map(p => {
-      if (p.id === patientId) {
-        return { ...p, treatments: p.treatments.filter(t => t.id !== treatmentId) };
+    try {
+      const response = await authApi.deleteTreatment(treatmentId);
+
+      if (response.success) {
+        setPatients(prev => prev.map(p => {
+          if (p.id === patientId) {
+            return { ...p, treatments: p.treatments.filter(t => t.id !== treatmentId) };
+          }
+          return p;
+        }));
       }
-      return p;
-    }));
+    } catch (error) {
+      console.error('Failed to delete treatment:', error);
+      alert('Failed to delete record. Please try again.');
+    }
   };
 
   return (

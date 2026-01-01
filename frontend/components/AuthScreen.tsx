@@ -24,6 +24,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onSignupSuccess
   const [otpInput, setOtpInput] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Loading States
@@ -70,11 +71,13 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onSignupSuccess
     setSelectedRole(role);
     setView('form');
     setError('');
+    setSuccessMsg('');
   };
 
   const handleAction = async () => {
     if (!selectedRole) return;
     setError('');
+    setSuccessMsg('');
     setIsLoading(true);
 
     try {
@@ -152,16 +155,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onSignupSuccess
       });
 
       if (response.success && response.data) {
-        authUtils.setToken(response.data.token);
-        const user: User = {
-          id: response.data.user.id,
-          role: response.data.user.role === 'patient' ? UserRole.PATIENT : UserRole.DOCTOR,
-          name: '', // Will be updated from profile
-          email: response.data.user.email,
-          cnic: response.data.user.cnic,
-          isVerified: response.data.user.isVerified
-        };
-        onSignupSuccess(user, response.data.token);
+        // Redirect to login instead of auto-login
+        setAuthMode('signin');
+        setView('form');
+        setOtpInput('');
+        setOtpEmail('');
+        setSuccessMsg('Account verified successfully. Please sign in to continue.');
       }
     } catch (error: any) {
       setError(error.message || 'Verification failed. Please try again.');
@@ -171,8 +170,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onSignupSuccess
   };
 
   return (
-    <div className="max-w-md mx-auto py-12">
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-md mx-auto py-6 sm:py-12 px-4">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-100 animate-in slide-in-from-bottom-4 duration-500">
 
         {view === 'role-selection' && (
           <div className="space-y-8 text-center">
@@ -240,6 +239,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onSignupSuccess
             </div>
 
             {error && <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-[10px] rounded-lg text-center font-medium">{error}</div>}
+            {successMsg && <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] rounded-lg text-center font-medium">{successMsg}</div>}
 
             <div className="space-y-4">
               {authMode === 'signup' && (

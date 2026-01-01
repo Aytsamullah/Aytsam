@@ -8,7 +8,8 @@ const {
   getProfile,
   login,
   getAllPatients,
-  addTreatment
+  addTreatment,
+  deleteTreatment
 } = require('../controllers/authController');
 
 const {
@@ -38,5 +39,6 @@ router.post('/login', authLimiter, login);
 router.get('/profile', protect, getProfile);
 router.get('/patients', protect, getAllPatients);
 router.post('/treatments', protect, addTreatment);
+router.delete('/treatments/:id', protect, deleteTreatment);
 
 module.exports = router;
