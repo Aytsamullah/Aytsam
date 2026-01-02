@@ -2,15 +2,10 @@ const nodemailer = require('nodemailer');
 
 // Create transporter
 const createTransporter = () => {
-  const port = parseInt(process.env.EMAIL_PORT || '587');
-  const isSecure = process.env.EMAIL_SECURE === 'true' || port === 465;
-
-  console.log(`Initializing Email Transporter: Host=${process.env.EMAIL_HOST}, Port=${port}, Secure=${isSecure}`);
+  console.log(`Initializing Email Transporter: Service=Gmail, User=${process.env.EMAIL_USER}`);
 
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: port,
-    secure: isSecure, // true for 465, false for others
+    service: 'gmail', // Built-in transport for Gmail (handles Host/Port/Secure automatically)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
