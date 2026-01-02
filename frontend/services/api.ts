@@ -205,18 +205,16 @@ export const authUtils = {
 // Health check
 export const healthCheck = async (): Promise<boolean> => {
   try {
-    // We need to check the base URL, but removing '/api' if it's there might be tricky 
-    // depending on how API_BASE_URL is set. 
-    // If API_BASE_URL is http://locahost:5000/api, we want http://localhost:5000/health
-    // For now, let's try to construct it relative to the API_BASE_URL or fallback to localhost
-
-    let healthUrl = 'http://localhost:5000/health';
+    // Construct health check URL from API_BASE_URL
+    // If API_BASE_URL is http://localhost:5000/api, we want http://localhost:5000/health
+    // If API_BASE_URL is https://your-backend.onrender.com/api, we want https://your-backend.onrender.com/health
+    let healthUrl: string;
 
     if (API_BASE_URL.includes('/api')) {
       healthUrl = API_BASE_URL.replace('/api', '/health');
     } else {
-      // If it doesn't have /api, maybe it is the root? just append /health
-      healthUrl = `${API_BASE_URL}/health`;
+      // If it doesn't have /api, append /health
+      healthUrl = `${API_BASE_URL.replace(/\/$/, '')}/health`;
     }
 
     const response = await fetch(healthUrl, {
