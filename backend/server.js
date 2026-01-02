@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const corsMiddleware = require('./middleware/cors');
 const { globalErrorHandler } = require('./middleware/errorHandler');
 const connectDB = require('./config/database');
+const { testEmailConnection } = require('./services/emailService');
 const authRoutes = require('./routes/auth');
 require('dotenv').config();
 
@@ -10,6 +11,15 @@ const app = express();
 
 // Connect to database
 connectDB();
+
+// Test Email Connection on Startup
+testEmailConnection().then(isReady => {
+  if (isReady) {
+    console.log('✅ Email Service: Ready to send emails');
+  } else {
+    console.error('❌ Email Service: Connection Failed');
+  }
+});
 
 // Security middleware
 app.use(helmet());
