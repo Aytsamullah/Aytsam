@@ -14,6 +14,9 @@ connectDB();
 // Security middleware
 app.use(helmet());
 
+// Trust proxy (Required for Render/Vercel/Heroku)
+app.set('trust proxy', 1);
+
 // CORS middleware
 app.use(corsMiddleware);
 
