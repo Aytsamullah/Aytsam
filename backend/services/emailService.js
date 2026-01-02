@@ -146,45 +146,55 @@ const generateOtpEmailTemplate = (otp, expiryMinutes = 5) => {
 // Send OTP email
 const sendOtpEmail = async (email, otp, type = 'signup') => {
   try {
-    const transporter = createTransporter();
-
-    // Verify transporter configuration
-    await transporter.verify();
-
     const subject = type === 'signup' ? 'Verify Your MedChain Account' : 'Password Reset Code';
     const html = generateOtpEmailTemplate(otp);
 
-    const mailOptions = {
-      from: {
-        name: 'MedChain EMR',
-        address: process.env.EMAIL_FROM || process.env.EMAIL_USER
-      },
-      to: email,
-      subject: subject,
-      html: html
-    };
+    // Option 1: Use Resend (HTTPS) if API Key is available
+    if (process.env.RESEND_API_KEY) {
+      console.log(`[Email] Sending via Resend API to ${email}`);
+      const { Resend } = require('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const info = await transporter.sendMail(mailOptions);
+      const { data, error } = await resend.emails.send({
+        from: 'MedChain EMR <onboarding@resend.dev>', // Use default testing domain initially
+        to: email, // Resend Free Tier only sends to your own email until verified. 
+        // User needs to verify domain or just use their registered email for testing.
+        subject: subject,
+        html: html
+      });
 
-    console.log('OTP email sent successfully:', {
-      messageId: info.messageId,
-      email: email,
-      type: type
-    });
+      if (error) {
+        throw new Error(`Resend API Error: ${error.message}`);
+      }
 
-    return {
-      success: true,
-      messageId: info.messageId
-    };
+      console.log('OTP email sent successfully via Resend:', data);
+      return { success: true, messageId: data.id };
+    }
+
+    // Option 2: Fallback to Nodemailer (SMTP)
+    else {
+      console.log(`[Email] Sending via Nodemailer (SMTP) to ${email}`);
+      const transporter = createTransporter();
+      await transporter.verify();
+
+      const mailOptions = {
+        from: {
+          name: 'MedChain EMR',
+          address: process.env.EMAIL_FROM || process.env.EMAIL_USER
+        },
+        to: email,
+        subject: subject,
+        html: html
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log('OTP email sent successfully via Nodemailer:', info.messageId);
+      return { success: true, messageId: info.messageId };
+    }
 
   } catch (error) {
     console.error('Error sending OTP email:', error);
-    console.error('Error details:', {
-      code: error.code,
-      command: error.command,
-      response: error.response,
-      responseCode: error.responseCode
-    });
+    // ... existing error logging ...
     throw new Error(`Failed to send OTP email: ${error.message}`);
   }
 };
