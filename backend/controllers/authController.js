@@ -96,7 +96,8 @@ const signup = asyncHandler(async (req, res, next) => {
     await User.findByIdAndDelete(user._id);
     await OTP.deleteMany({ userId: user._id });
 
-    return next(new AppError('Failed to send verification email. Please check your email configuration.', 500));
+    // Return the specific error message to help debugging (e.g. "Invalid login", "ETIMEDOUT")
+    return next(new AppError(`Email Error: ${emailError.message}. Check EMAIL_USER and EMAIL_PASS (App Password).`, 500));
   }
 
   res.status(201).json({
